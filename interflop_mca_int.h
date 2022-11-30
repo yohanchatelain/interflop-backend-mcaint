@@ -13,7 +13,7 @@
 #ifndef __INTERFLOP_MCAINT_H__
 #define __INTERFLOP_MCAINT_H__
 
-#include "interflop_stdlib.h"
+#include "interflop-stdlib/interflop_stdlib.h"
 
 #define INTERFLOP_MCAINT_API(name) interflop_mcaint_##name
 
