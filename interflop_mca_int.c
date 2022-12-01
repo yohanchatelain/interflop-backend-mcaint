@@ -450,8 +450,8 @@ void INTERFLOP_MCAINT_API(div_float)(float a, float b, float *res,
   *res = _mca_binary32_binary_op(a, b, mca_div, context);
 }
 
-void INTERFLOP_MCAINT_API(madd_float)(float a, float b, float c, float *res,
-                                      void *context) {
+void INTERFLOP_MCAINT_API(fma_float)(float a, float b, float c, float *res,
+                                     void *context) {
   *res = _mca_binary32_ternary_op(a, b, c, mca_fma, context);
 }
 
@@ -475,8 +475,8 @@ void INTERFLOP_MCAINT_API(div_double)(double a, double b, double *res,
   *res = _mca_binary64_binary_op(a, b, mca_div, context);
 }
 
-void INTERFLOP_MCAINT_API(madd_double)(double a, double b, double c,
-                                       double *res, void *context) {
+void INTERFLOP_MCAINT_API(fma_double)(double a, double b, double c, double *res,
+                                      void *context) {
   *res = _mca_binary64_ternary_op(a, b, c, mca_fma, context);
 }
 
@@ -683,8 +683,8 @@ struct interflop_backend_interface_t INTERFLOP_MCAINT_API(init)(void *context) {
     interflop_div_double : INTERFLOP_MCAINT_API(div_double),
     interflop_cmp_double : NULL,
     interflop_cast_double_to_float : INTERFLOP_MCAINT_API(cast_double_to_float),
-    interflop_madd_float : INTERFLOP_MCAINT_API(madd_float),
-    interflop_madd_double : INTERFLOP_MCAINT_API(madd_double),
+    interflop_fma_float : INTERFLOP_MCAINT_API(fma_float),
+    interflop_fma_double : INTERFLOP_MCAINT_API(fma_double),
     interflop_enter_function : NULL,
     interflop_exit_function : NULL,
     interflop_user_call : NULL,

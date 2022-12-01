@@ -1,4 +1,3 @@
-SUBDIRS=common
 lib_LTLIBRARIES = libinterflop_mca_int.la
 libinterflop_mca_int_la_SOURCES = \
     interflop_mca_int.c \
