@@ -11,7 +11,7 @@ libinterflop_mca_int_la_LDFLAGS = -lm
 libinterflop_mca_int_la_LIBADD = \
     @INTERFLOP_STDLIB_PATH@/lib/libinterflop_rng.la \
     @INTERFLOP_STDLIB_PATH@/lib/libinterflop_fma.la 
-if BUILD_INTERFLOP_STDLIB
+if LINK_INTERFLOP_STDLIB
 libinterflop_mca_int_la_LIBADD += @INTERFLOP_STDLIB_PATH@/lib/libinterflop_stdlib.la
 endif
 library_includedir =$(includedir)/
