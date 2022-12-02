@@ -20,7 +20,6 @@
 
 #include <argp.h>
 #include <err.h>
-#include <errno.h>
 #include <math.h>
 #include <pthread.h>
 #include <stdatomic.h>
@@ -139,10 +138,6 @@ static void _set_mca_precision_binary64(const int precision, void *context) {
 /* global thread identifier */
 static pid_t global_tid = 0;
 
-/* helper data structure to centralize the data used for random number
- * generation */
-static __thread rng_state_t rng_state;
-
 /* noise = rand * 2^(exp) */
 /* We can skip special cases since we never meet them */
 /* Since we have exponent of float values, the result */
@@ -231,13 +226,13 @@ static void _noise_binary128(__float128 *x, const int exp,
 /* Adds the mca noise to da */
 void _mca_inexact_binary64(double *da, void *context) {
   mcaint_context_t *ctx = (mcaint_context_t *)context;
-  _INEXACT(da, ctx->binary32_precision, ctx, rng_state);
+  _INEXACT(da, ctx->binary32_precision, ctx, ctx->rng_state);
 }
 
 /* Adds the mca noise to qa */
 void _mca_inexact_binary128(__float128 *qa, void *context) {
   mcaint_context_t *ctx = (mcaint_context_t *)context;
-  _INEXACT(qa, ctx->binary64_precision, ctx, rng_state);
+  _INEXACT(qa, ctx->binary64_precision, ctx, ctx->rng_state);
 }
 
 /* Generic functions that adds noise to A */
@@ -505,12 +500,13 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
   mcaint_context_t *ctx = (mcaint_context_t *)state->input;
   char *endptr;
   int val = -1;
+  int error = 0;
   switch (key) {
   case KEY_PREC_B32:
     /* precision for binary32 */
-    errno = 0;
-    val = strtol(arg, &endptr, 10);
-    if (errno != 0 || val != MCA_PRECISION_BINARY32_DEFAULT) {
+    error = 0;
+    val = interflop_strtol(arg, &endptr, &error);
+    if (error != 0 || val != MCA_PRECISION_BINARY32_DEFAULT) {
       logger_error("--%s invalid value provided, MCA integer does not support "
                    "custom precisions",
                    key_prec_b32_str);
@@ -519,9 +515,9 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
     break;
   case KEY_PREC_B64:
     /* precision for binary64 */
-    errno = 0;
-    val = strtol(arg, &endptr, 10);
-    if (errno != 0 || val != MCA_PRECISION_BINARY64_DEFAULT) {
+    error = 0;
+    val = interflop_strtol(arg, &endptr, &error);
+    if (error != 0 || val != MCA_PRECISION_BINARY64_DEFAULT) {
       logger_error("--%s invalid value provided, MCA integer does not support "
                    "custom precisions",
                    key_prec_b64_str);
@@ -530,13 +526,13 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
     break;
   case KEY_MODE:
     /* mca mode */
-    if (strcasecmp(MCA_MODE_STR[mcamode_ieee], arg) == 0) {
+    if (interflop_strcasecmp(MCA_MODE_STR[mcamode_ieee], arg) == 0) {
       _set_mca_mode(mcamode_ieee, ctx);
-    } else if (strcasecmp(MCA_MODE_STR[mcamode_mca], arg) == 0) {
+    } else if (interflop_strcasecmp(MCA_MODE_STR[mcamode_mca], arg) == 0) {
       _set_mca_mode(mcamode_mca, ctx);
-    } else if (strcasecmp(MCA_MODE_STR[mcamode_pb], arg) == 0) {
+    } else if (interflop_strcasecmp(MCA_MODE_STR[mcamode_pb], arg) == 0) {
       _set_mca_mode(mcamode_pb, ctx);
-    } else if (strcasecmp(MCA_MODE_STR[mcamode_rr], arg) == 0) {
+    } else if (interflop_strcasecmp(MCA_MODE_STR[mcamode_rr], arg) == 0) {
       _set_mca_mode(mcamode_rr, ctx);
     } else {
       logger_error("--%s invalid value provided, must be one of: "
@@ -546,10 +542,10 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
     break;
   case KEY_SEED:
     /* seed */
-    errno = 0;
+    error = 0;
     ctx->choose_seed = true;
-    ctx->seed = strtoull(arg, &endptr, 10);
-    if (errno != 0) {
+    ctx->seed = interflop_strtol(arg, &endptr, &error);
+    if (error != 0) {
       logger_error("--%s invalid value provided, must be an integer",
                    key_seed_str);
     }
@@ -564,12 +560,12 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
     break;
   case KEY_SPARSITY:
     /* sparse perturbations */
-    errno = 0;
-    ctx->sparsity = strtof(arg, &endptr);
+    error = 0;
+    ctx->sparsity = interflop_strtod(arg, &endptr, &error);
     if (ctx->sparsity <= 0) {
-      errno = 1;
+      error = 1;
     }
-    if (errno != 0) {
+    if (error != 0) {
       logger_error("--%s invalid value provided, must be positive",
                    key_sparsity_str);
     }
@@ -693,7 +689,7 @@ struct interflop_backend_interface_t INTERFLOP_MCAINT_API(init)(void *context) {
 
   /* The seed for the RNG is initialized upon the first request for a random
      number */
-  _init_rng_state_struct(&rng_state, ctx->choose_seed, ctx->seed, false);
+  _init_rng_state_struct(&ctx->rng_state, ctx->choose_seed, ctx->seed, false);
 
   return interflop_backend_mcaint;
 }
