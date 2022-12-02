@@ -44,6 +44,13 @@
 #include "interflop-stdlib/rng/vfc_rng.h"
 #include "interflop_mca_int.h"
 
+/* Disable thread safety for RNG required for Valgrind */
+#ifdef RNG_THREAD_SAFE
+#define TLS __thread
+#else
+#define TLS
+#endif
+
 typedef enum {
   KEY_PREC_B32,
   KEY_PREC_B64,
@@ -81,15 +88,6 @@ typedef enum {
 static const char *MCA_ERR_MODE_STR[] = {[mca_err_mode_rel] = "rel",
                                          [mca_err_mode_abs] = "abs",
                                          [mca_err_mode_all] = "all"};
-
-/* define default environment variables and default parameters */
-#define MCA_PRECISION_BINARY32_MIN 1
-#define MCA_PRECISION_BINARY64_MIN 1
-#define MCA_PRECISION_BINARY32_MAX DOUBLE_PMAN_SIZE
-#define MCA_PRECISION_BINARY64_MAX QUAD_PMAN_SIZE
-#define MCA_PRECISION_BINARY32_DEFAULT FLOAT_PREC
-#define MCA_PRECISION_BINARY64_DEFAULT DOUBLE_PREC
-#define MCA_MODE_DEFAULT mcamode_mca
 
 /* possible operations values */
 typedef enum {
@@ -140,7 +138,9 @@ static pid_t global_tid = 0;
 
 /* helper data structure to centralize the data used for random number
  * generation */
-static __thread rng_state_t rng_state;
+static TLS rng_state_t rng_state;
+/* copy */
+static TLS rng_state_t __rng_state;
 
 /* noise = rand * 2^(exp) */
 /* We can skip special cases since we never meet them */
@@ -228,13 +228,13 @@ static void _noise_binary128(__float128 *x, const int exp,
   }
 
 /* Adds the mca noise to da */
-void _mca_inexact_binary64(double *da, void *context) {
+static void _mca_inexact_binary64(double *da, void *context) {
   mcaint_context_t *ctx = (mcaint_context_t *)context;
   _INEXACT(da, ctx->binary32_precision, ctx, rng_state);
 }
 
 /* Adds the mca noise to qa */
-void _mca_inexact_binary128(__float128 *qa, void *context) {
+static void _mca_inexact_binary128(__float128 *qa, void *context) {
   mcaint_context_t *ctx = (mcaint_context_t *)context;
   _INEXACT(qa, ctx->binary64_precision, ctx, rng_state);
 }
@@ -582,7 +582,7 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
 
 struct argp argp = {options, parse_opt, "", "", NULL, NULL, NULL};
 
-void init_context(mcaint_context_t *ctx) {
+static void init_context(mcaint_context_t *ctx) {
   ctx->relErr = true;
   ctx->absErr = false;
   ctx->absErr_exp = 112;
@@ -593,7 +593,7 @@ void init_context(mcaint_context_t *ctx) {
   ctx->sparsity = 1.0f;
 }
 
-void print_information_header(void *context) {
+static void print_information_header(void *context) {
   mcaint_context_t *ctx = (mcaint_context_t *)context;
 
   logger_info(

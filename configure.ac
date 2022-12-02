@@ -18,6 +18,14 @@ if test "x$WALL_CFLAGS" = "xyes"; then
    AC_MSG_NOTICE([-Wall is set])
 fi
 
+AC_ARG_ENABLE(rng-thread-safe, AS_HELP_STRING([--enable-rng-thread-safe],[Enable Thread-Safe RNG]), [RNG_THREAD_SAFE="$withval"], [RNG_THREAD_SAFE="yes"])
+AM_CONDITIONAL([RNG_THREAD_SAFE], [test "x$RNG_THREAD_SAFE" = "xyes"])
+if test "x$RNG_THREAD_SAFE" = "xyes"; then
+   AC_DEFINE([RNG_THREAD_SAFE], [],  ["Enable --rng-thread-safe"])
+else
+   AC_MSG_NOTICE([--rng-thread-safe is disabled])
+fi
+
 AX_INTERFLOP_STDLIB()
 
 AC_CONFIG_FILES([

@@ -17,6 +17,15 @@
 
 #define INTERFLOP_MCAINT_API(name) interflop_mcaint_##name
 
+/* define default environment variables and default parameters */
+#define MCA_PRECISION_BINARY32_MIN 1
+#define MCA_PRECISION_BINARY64_MIN 1
+#define MCA_PRECISION_BINARY32_MAX DOUBLE_PMAN_SIZE
+#define MCA_PRECISION_BINARY64_MAX QUAD_PMAN_SIZE
+#define MCA_PRECISION_BINARY32_DEFAULT FLOAT_PREC
+#define MCA_PRECISION_BINARY64_DEFAULT DOUBLE_PREC
+#define MCA_MODE_DEFAULT mcamode_mca
+
 /* define the available MCA modes of operation */
 typedef enum {
   mcamode_ieee,
