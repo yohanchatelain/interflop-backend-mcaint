@@ -138,6 +138,10 @@ static void _set_mca_precision_binary64(const int precision, void *context) {
 /* global thread identifier */
 static pid_t global_tid = 0;
 
+/* helper data structure to centralize the data used for random number
+ * generation */
+static __thread rng_state_t rng_state;
+
 /* noise = rand * 2^(exp) */
 /* We can skip special cases since we never meet them */
 /* Since we have exponent of float values, the result */
@@ -226,13 +230,13 @@ static void _noise_binary128(__float128 *x, const int exp,
 /* Adds the mca noise to da */
 void _mca_inexact_binary64(double *da, void *context) {
   mcaint_context_t *ctx = (mcaint_context_t *)context;
-  _INEXACT(da, ctx->binary32_precision, ctx, ctx->rng_state);
+  _INEXACT(da, ctx->binary32_precision, ctx, rng_state);
 }
 
 /* Adds the mca noise to qa */
 void _mca_inexact_binary128(__float128 *qa, void *context) {
   mcaint_context_t *ctx = (mcaint_context_t *)context;
-  _INEXACT(qa, ctx->binary64_precision, ctx, ctx->rng_state);
+  _INEXACT(qa, ctx->binary64_precision, ctx, rng_state);
 }
 
 /* Generic functions that adds noise to A */
@@ -633,17 +637,21 @@ void INTERFLOP_MCAINT_API(CLI)(int argc, char **argv, void *context) {
   }
 
 void _mcaint_check_stdlib(void) {
-  CHECK_IMPL(malloc);
   CHECK_IMPL(exit);
   CHECK_IMPL(fopen);
   CHECK_IMPL(fprintf);
   CHECK_IMPL(getenv);
   CHECK_IMPL(gettid);
+  CHECK_IMPL(malloc);
   CHECK_IMPL(sprintf);
   CHECK_IMPL(strcasecmp);
   CHECK_IMPL(strerror);
+  CHECK_IMPL(strtod);
+  CHECK_IMPL(strtol);
   CHECK_IMPL(vfprintf);
   CHECK_IMPL(vwarnx);
+  /* vfc_rng */
+  CHECK_IMPL(gettimeofday);
 }
 
 void INTERFLOP_MCAINT_API(pre_init)(File *stream, interflop_panic_t panic,
@@ -689,7 +697,7 @@ struct interflop_backend_interface_t INTERFLOP_MCAINT_API(init)(void *context) {
 
   /* The seed for the RNG is initialized upon the first request for a random
      number */
-  _init_rng_state_struct(&ctx->rng_state, ctx->choose_seed, ctx->seed, false);
+  _init_rng_state_struct(&rng_state, ctx->choose_seed, ctx->seed, false);
 
   return interflop_backend_mcaint;
 }

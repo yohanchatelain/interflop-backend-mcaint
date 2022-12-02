@@ -28,9 +28,6 @@ typedef enum {
 
 /* Interflop context */
 typedef struct {
-/* helper data structure to centralize the data used for random number
- * generation */
-  rng_state_t rng_state;
   IBool relErr;
   IBool absErr;
   IBool daz;
