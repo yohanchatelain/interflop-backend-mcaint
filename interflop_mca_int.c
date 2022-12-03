@@ -197,12 +197,14 @@ static void _noise_binary128(__float128 *x, const int exp,
 }
 
 /* Macro function for checking if the value X must be noised */
-#define _MUST_NOT_BE_NOISED(X, VIRTUAL_PRECISION, CTX)                                                       \
-  /* if mode ieee, do not introduce noise */                                                                 \
-  (CTX->mode == mcamode_ieee) || /* Check that we are not in a special case */                               \
-      (FPCLASSIFY(X) != FP_NORMAL && FPCLASSIFY(X) != FP_SUBNORMAL) ||                                       \
-      /* In RR if the number is representable in current virtual precision, */ /* do not add any noise if */ \
-      (CTX->mode == mcamode_rr && _IS_REPRESENTABLE(X, VIRTUAL_PRECISION))
+#define _MUST_NOT_BE_NOISED(X, VIRTUAL_PRECISION, CTX)                         \
+  /* if mode ieee, do not introduce noise */                                   \
+  (CTX->mode == mcamode_ieee) || \
+  /* Check that we are not in a special case */ \
+  (FPCLASSIFY(X) != FP_NORMAL && FPCLASSIFY(X) != FP_SUBNORMAL) ||         \
+  /* In RR if the number is representable in current virtual precision, */ \
+  /* do not add any noise if */                                           \
+  (CTX->mode == mcamode_rr && _IS_REPRESENTABLE(X, VIRTUAL_PRECISION))
 
 /* Generic function for computing the mca noise */
 #define _NOISE(X, EXP, RNG_STATE)                                              \
@@ -375,51 +377,57 @@ static void _mca_inexact_binary128(__float128 *qa, void *context) {
 
 /* Performs mca(dop a) where a is a binary32 value */
 /* Intermediate computations are performed with binary64 */
-inline float _mca_binary32_unary_op(const float a, const mca_operations dop,
-                                    void *context) {
+static inline float
+_mca_binary32_unary_op(const float a, const mca_operations dop, void *context) {
   _MCA_UNARY_OP(a, dop, context, (double)0);
 }
 
 /* Performs mca(a dop b) where a and b are binary32 values */
 /* Intermediate computations are performed with binary64 */
-inline float _mca_binary32_binary_op(const float a, const float b,
-                                     const mca_operations dop, void *context) {
+static inline float _mca_binary32_binary_op(const float a, const float b,
+                                            const mca_operations dop,
+                                            void *context) {
   _MCA_BINARY_OP(a, b, dop, context, (double)0);
 }
 
 /* Performs mca(a dop b dop c) where a, b and c are binary32 values */
 /* Intermediate computations are performed with binary64 */
-float _mca_binary32_ternary_op(const float a, const float b, const float c,
-                               const mca_operations dop, void *context);
+// float _mca_binary32_ternary_op(const float a, const float b, const float c,
+//                                const mca_operations dop, void *context);
 
-inline float _mca_binary32_ternary_op(const float a, const float b,
-                                      const float c, const mca_operations dop,
-                                      void *context) {
+static inline float _mca_binary32_ternary_op(const float a, const float b,
+                                             const float c,
+                                             const mca_operations dop,
+                                             void *context) {
   _MCA_TERNARY_OP(a, b, c, dop, context, (double)0);
 }
 
 /* Performs mca(qop a) where a is a binary64 value */
 /* Intermediate computations are performed with binary128 */
-inline double _mca_binary64_unary_op(const double a, const mca_operations qop,
-                                     void *context) {
+static inline double _mca_binary64_unary_op(const double a,
+                                            const mca_operations qop,
+                                            void *context) {
   _MCA_UNARY_OP(a, qop, context, (__float128)0);
 }
 
 /* Performs mca(a qop b) where a and b are binary64 values */
 /* Intermediate computations are performed with binary128 */
-inline double _mca_binary64_binary_op(const double a, const double b,
-                                      const mca_operations qop, void *context) {
+static inline double _mca_binary64_binary_op(const double a, const double b,
+                                             const mca_operations qop,
+                                             void *context) {
   _MCA_BINARY_OP(a, b, qop, context, (__float128)0);
 }
 
 /* Performs mca(a qop b qop c) where a, b and c are binary64 values */
 /* Intermediate computations are performed with binary128 */
-double _mca_binary64_ternary_op(const double a, const double b, const double c,
-                                const mca_operations qop, void *context);
+// double _mca_binary64_ternary_op(const double a, const double b, const double
+// c,
+//                                 const mca_operations qop, void *context);
 
-inline double _mca_binary64_ternary_op(const double a, const double b,
-                                       const double c, const mca_operations qop,
-                                       void *context) {
+static inline double _mca_binary64_ternary_op(const double a, const double b,
+                                              const double c,
+                                              const mca_operations qop,
+                                              void *context) {
   _MCA_TERNARY_OP(a, b, c, qop, context, (__float128)0);
 }
 
