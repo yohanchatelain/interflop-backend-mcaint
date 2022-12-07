@@ -663,7 +663,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   return 0;
 }
 
-struct argp argp = {options, parse_opt, "", "", NULL, NULL, NULL};
+static struct argp argp = {options, parse_opt, "", "", NULL, NULL, NULL};
 
 static void init_context(mcaint_context_t *ctx) {
   ctx->mode = MCAINT_MODE_DEFAULT;
