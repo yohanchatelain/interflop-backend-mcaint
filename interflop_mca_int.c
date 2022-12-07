@@ -577,7 +577,7 @@ static struct argp_option options[] = {
      "one in {sparsity} operations will be perturbed. 0 < sparsity <= 1.", 0},
     {0}};
 
-error_t parse_opt(int key, char *arg, struct argp_state *state) {
+static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   mcaint_context_t *ctx = (mcaint_context_t *)state->input;
   char *endptr;
   int val = -1;
