@@ -18,22 +18,36 @@
 #define INTERFLOP_MCAINT_API(name) interflop_mcaint_##name
 
 /* define default environment variables and default parameters */
-#define MCA_PRECISION_BINARY32_MIN 1
-#define MCA_PRECISION_BINARY64_MIN 1
-#define MCA_PRECISION_BINARY32_MAX DOUBLE_PMAN_SIZE
-#define MCA_PRECISION_BINARY64_MAX QUAD_PMAN_SIZE
-#define MCA_PRECISION_BINARY32_DEFAULT FLOAT_PREC
-#define MCA_PRECISION_BINARY64_DEFAULT DOUBLE_PREC
-#define MCA_MODE_DEFAULT mcamode_mca
+#define MCAINT_PRECISION_BINARY32_MIN 1
+#define MCAINT_PRECISION_BINARY64_MIN 1
+#define MCAINT_PRECISION_BINARY32_MAX DOUBLE_PMAN_SIZE
+#define MCAINT_PRECISION_BINARY64_MAX QUAD_PMAN_SIZE
+#define MCAINT_PRECISION_BINARY32_DEFAULT FLOAT_PREC
+#define MCAINT_PRECISION_BINARY64_DEFAULT DOUBLE_PREC
+#define MCAINT_ABSOLUTE_ERROR_EXPONENT_DEFAULT 112 // Why 112?
+#define MCAINT_SEED_DEFAULT 0ULL
+#define MCAINT_SPARSITY_DEFAULT 1.0f
+#define MCAINT_MODE_DEFAULT mcaint_mode_mca
+#define MCAINT_ERR_MODE_DEFAULT mcaint_err_mode_rel
+#define MCAINT_DAZ_DEFAULT IFalse
+#define MCAINT_FTZ_DEFAULT IFalse
 
 /* define the available MCA modes of operation */
 typedef enum {
-  mcamode_ieee,
-  mcamode_mca,
-  mcamode_pb,
-  mcamode_rr,
-  _mcamode_end_
-} mcamode;
+  mcaint_mode_ieee,
+  mcaint_mode_mca,
+  mcaint_mode_pb,
+  mcaint_mode_rr,
+  _mcaint_mode_end_
+} mcaint_mode;
+
+/* define the available error modes */
+typedef enum {
+  mcaint_err_mode_rel,
+  mcaint_err_mode_abs,
+  mcaint_err_mode_all,
+  _mcaint_err_mode_end_
+} mcaint_err_mode;
 
 /* Interflop context */
 typedef struct {
@@ -42,12 +56,59 @@ typedef struct {
   IBool daz;
   IBool ftz;
   IBool choose_seed;
-  mcamode mode;
+  mcaint_mode mode;
   int binary32_precision;
   int binary64_precision;
   int absErr_exp;
   float sparsity;
   IUint64_t seed;
 } mcaint_context_t;
+
+typedef struct {
+  IUint64_t seed;
+  float sparsity;
+  IUint32_t precision_binary32;
+  IUint32_t precision_binary64;
+  mcaint_mode mode;
+  mcaint_err_mode err_mode;
+  IInt64_t max_abs_err_exponent;
+  IUint32_t daz;
+  IUint32_t ftz;
+} mcaint_conf_t;
+
+const char *INTERFLOP_MCAINT_API(get_backend_name)(void);
+const char *INTERFLOP_MCAINT_API(get_version_name)(void);
+
+void mcaint_push_seed(IUint64_t seed);
+void mcaint_pop_seed(void);
+
+void INTERFLOP_MCAINT_API(add_float)(float a, float b, float *res,
+                                     void *context);
+void INTERFLOP_MCAINT_API(sub_float)(float a, float b, float *res,
+                                     void *context);
+void INTERFLOP_MCAINT_API(mul_float)(float a, float b, float *res,
+                                     void *context);
+void INTERFLOP_MCAINT_API(div_float)(float a, float b, float *res,
+                                     void *context);
+void INTERFLOP_MCAINT_API(fma_float)(float a, float b, float c, float *res,
+                                     void *context);
+void INTERFLOP_MCAINT_API(add_double)(double a, double b, double *res,
+                                      void *context);
+void INTERFLOP_MCAINT_API(sub_double)(double a, double b, double *res,
+                                      void *context);
+void INTERFLOP_MCAINT_API(mul_double)(double a, double b, double *res,
+                                      void *context);
+void INTERFLOP_MCAINT_API(div_double)(double a, double b, double *res,
+                                      void *context);
+void INTERFLOP_MCAINT_API(fma_double)(double a, double b, double c, double *res,
+                                      void *context);
+void INTERFLOP_MCAINT_API(cast_double_to_float)(double a, float *res,
+                                                void *context);
+
+void INTERFLOP_MCAINT_API(configure)(mcaint_conf_t conf, void *context);
+void INTERFLOP_MCAINT_API(CLI)(int argc, char **argv, void *context);
+void INTERFLOP_MCAINT_API(pre_init)(File *stream, interflop_panic_t panic,
+                                    void **context);
+struct interflop_backend_interface_t INTERFLOP_MCAINT_API(init)(void *context);
 
 #endif /* __INTERFLOP_MCAINT_H__ */

@@ -73,31 +73,24 @@ static const char key_daz_str[] = "daz";
 static const char key_ftz_str[] = "ftz";
 static const char key_sparsity_str[] = "sparsity";
 
-static const char *MCA_MODE_STR[] = {[mcamode_ieee] = "ieee",
-                                     [mcamode_mca] = "mca",
-                                     [mcamode_pb] = "pb",
-                                     [mcamode_rr] = "rr"};
+static const char *MCAINT_MODE_STR[] = {[mcaint_mode_ieee] = "ieee",
+                                        [mcaint_mode_mca] = "mca",
+                                        [mcaint_mode_pb] = "pb",
+                                        [mcaint_mode_rr] = "rr"};
 
-/* define the available error modes */
-typedef enum {
-  mca_err_mode_rel,
-  mca_err_mode_abs,
-  mca_err_mode_all
-} mca_err_mode;
-
-static const char *MCA_ERR_MODE_STR[] = {[mca_err_mode_rel] = "rel",
-                                         [mca_err_mode_abs] = "abs",
-                                         [mca_err_mode_all] = "all"};
+static const char *MCAINT_ERR_MODE_STR[] = {[mcaint_err_mode_rel] = "rel",
+                                            [mcaint_err_mode_abs] = "abs",
+                                            [mcaint_err_mode_all] = "all"};
 
 /* possible operations values */
 typedef enum {
-  mca_add = '+',
-  mca_sub = '-',
-  mca_mul = '*',
-  mca_div = '/',
-  mca_fma = 'f',
-  mca_cast = 'c',
-} mca_operations;
+  mcaint_add = '+',
+  mcaint_sub = '-',
+  mcaint_mul = '*',
+  mcaint_div = '/',
+  mcaint_fma = 'f',
+  mcaint_cast = 'c',
+} mcaint_operations;
 
 /******************** MCA CONTROL FUNCTIONS *******************
  * The following functions are used to set virtual precision and
@@ -105,10 +98,10 @@ typedef enum {
  ***************************************************************/
 
 /* Set the mca mode */
-static void _set_mca_mode(const mcamode mode, void *context) {
+static void _set_mcaint_mode(const mcaint_mode mode, void *context) {
   mcaint_context_t *ctx = (mcaint_context_t *)context;
 
-  if (mode >= _mcamode_end_) {
+  if (mode >= _mcaint_mode_end_) {
     logger_error("--%s invalid value provided, must be one of: "
                  "{ieee, mca, pb, rr}.",
                  key_mode_str);
@@ -117,16 +110,78 @@ static void _set_mca_mode(const mcamode mode, void *context) {
 }
 
 /* Set the virtual precision for binary32 */
-static void _set_mca_precision_binary32(const int precision, void *context) {
+static void _set_mcaint_precision_binary32(const int precision, void *context) {
   mcaint_context_t *ctx = (mcaint_context_t *)context;
-  _set_precision(MCA, precision, ctx->binary32_precision, (float)0);
+  _set_precision(MCAINT, precision, ctx->binary32_precision, (float)0);
 }
 
 /* Set the virtual precision for binary64 */
-static void _set_mca_precision_binary64(const int precision, void *context) {
+static void _set_mcaint_precision_binary64(const int precision, void *context) {
   mcaint_context_t *ctx = (mcaint_context_t *)context;
-  _set_precision(MCA, precision, ctx->binary64_precision, (double)0);
+  _set_precision(MCAINT, precision, ctx->binary64_precision, (double)0);
 }
+
+/* Set the error mode */
+static void _set_mcaint_error_mode(mcaint_err_mode mode,
+                                   mcaint_context_t *ctx) {
+  if (mode >= _mcaint_err_mode_end_) {
+    logger_error("invalid error mode provided, must be one of: "
+                 "{rel, abs, all}.");
+  } else {
+    switch (mode) {
+    case mcaint_err_mode_rel:
+      ctx->relErr = true;
+      ctx->absErr = false;
+      break;
+    case mcaint_err_mode_abs:
+      ctx->relErr = false;
+      ctx->absErr = true;
+      break;
+    case mcaint_err_mode_all:
+      ctx->relErr = true;
+      ctx->absErr = true;
+    default:
+      break;
+    }
+  }
+}
+
+/* Set the maximal absolute error exponent */
+static void _set_mcaint_max_abs_err_exp(long exponent, mcaint_context_t *ctx) {
+  ctx->absErr_exp = exponent;
+}
+
+/* Set Denormals-Are-Zero flag */
+static void _set_mcaint_daz(bool daz, mcaint_context_t *ctx) { ctx->daz = daz; }
+
+/* Set Flush-To-Zero flag */
+static void _set_mcaint_ftz(bool ftz, mcaint_context_t *ctx) { ctx->ftz = ftz; }
+
+/* Set sparsity value */
+static void _set_mcaint_sparsity(float sparsity, mcaint_context_t *ctx) {
+  if (sparsity <= 0) {
+    logger_error("invalid value for sparsity %d, must be positive");
+  } else {
+    ctx->sparsity = sparsity;
+  }
+}
+
+/* Set RNG seed */
+static void _set_mcaint_seed(uint64_t seed, mcaint_context_t *ctx) {
+  ctx->choose_seed = true;
+  ctx->seed = seed;
+}
+
+const char *get_mcaint_mode_name(mcaint_mode mode) {
+  if (mode >= _mcaint_mode_end_) {
+    return NULL;
+  } else {
+    return MCAINT_MODE_STR[mode];
+  }
+}
+const char *INTERFLOP_MCAINT_API(get_backend_name)(void) { return "mcaint"; }
+
+const char *INTERFLOP_MCAINT_API(get_version_name)(void) { return "1.x-dev"; }
 
 /******************** MCA RANDOM FUNCTIONS ********************
  * The following functions are used to calculate the random
@@ -141,6 +196,16 @@ static pid_t global_tid = 0;
 static TLS rng_state_t rng_state;
 /* copy */
 static TLS rng_state_t __rng_state;
+
+/* Function used by Verrou to save the */
+/* current rng state and replace it by the new seed */
+void mcaint_push_seed(uint64_t seed) {
+  __rng_state = rng_state;
+  _init_rng_state_struct(&rng_state, true, seed, false);
+}
+
+/* Function used by Verrou to restore the copied rng state */
+void mcaint_pop_seed() { rng_state = __rng_state; }
 
 /* noise = rand * 2^(exp) */
 /* We can skip special cases since we never meet them */
@@ -199,12 +264,12 @@ static void _noise_binary128(__float128 *x, const int exp,
 /* Macro function for checking if the value X must be noised */
 #define _MUST_NOT_BE_NOISED(X, VIRTUAL_PRECISION, CTX)                         \
   /* if mode ieee, do not introduce noise */                                   \
-  (CTX->mode == mcamode_ieee) || \
+  (CTX->mode == mcaint_mode_ieee) || \
   /* Check that we are not in a special case */ \
   (FPCLASSIFY(X) != FP_NORMAL && FPCLASSIFY(X) != FP_SUBNORMAL) ||         \
   /* In RR if the number is representable in current virtual precision, */ \
   /* do not add any noise if */                                           \
-  (CTX->mode == mcamode_rr && _IS_REPRESENTABLE(X, VIRTUAL_PRECISION))
+  (CTX->mode == mcaint_mode_rr && _IS_REPRESENTABLE(X, VIRTUAL_PRECISION))
 
 /* Generic function for computing the mca noise */
 #define _NOISE(X, EXP, RNG_STATE)                                              \
@@ -230,13 +295,13 @@ static void _noise_binary128(__float128 *x, const int exp,
   }
 
 /* Adds the mca noise to da */
-static void _mca_inexact_binary64(double *da, void *context) {
+static void _mcaint_inexact_binary64(double *da, void *context) {
   mcaint_context_t *ctx = (mcaint_context_t *)context;
   _INEXACT(da, ctx->binary32_precision, ctx, rng_state);
 }
 
 /* Adds the mca noise to qa */
-static void _mca_inexact_binary128(__float128 *qa, void *context) {
+static void _mcaint_inexact_binary128(__float128 *qa, void *context) {
   mcaint_context_t *ctx = (mcaint_context_t *)context;
   _INEXACT(qa, ctx->binary64_precision, ctx, rng_state);
 }
@@ -245,13 +310,13 @@ static void _mca_inexact_binary128(__float128 *qa, void *context) {
 /* The function is choosen depending on the type of X  */
 #define _INEXACT_BINARYN(X, A, CTX)                                            \
   _Generic(X, double                                                           \
-           : _mca_inexact_binary64, __float128                                 \
-           : _mca_inexact_binary128)(A, CTX)
+           : _mcaint_inexact_binary64, __float128                              \
+           : _mcaint_inexact_binary128)(A, CTX)
 
 /******************** MCA ARITHMETIC FUNCTIONS ********************
  * The following set of functions perform the MCA operation. Operands
  * are first converted to quad  format (GCC), inbound and outbound
- * perturbations are applied using the _mca_inexact function, and the
+ * perturbations are applied using the _mcaint_inexact function, and the
  * result converted to the original format for return
  *******************************************************************/
 
@@ -259,7 +324,7 @@ static void _mca_inexact_binary128(__float128 *qa, void *context) {
 /* and stores the result in (res) */
 #define PERFORM_UNARY_OP(op, res, a)                                           \
   switch (op) {                                                                \
-  case mca_cast:                                                               \
+  case mcaint_cast:                                                            \
     res = (float)(a);                                                          \
     break;                                                                     \
   default:                                                                     \
@@ -270,16 +335,16 @@ static void _mca_inexact_binary128(__float128 *qa, void *context) {
 /* and stores the result in (res) */
 #define PERFORM_BIN_OP(OP, RES, A, B)                                          \
   switch (OP) {                                                                \
-  case mca_add:                                                                \
+  case mcaint_add:                                                             \
     RES = (A) + (B);                                                           \
     break;                                                                     \
-  case mca_mul:                                                                \
+  case mcaint_mul:                                                             \
     RES = (A) * (B);                                                           \
     break;                                                                     \
-  case mca_sub:                                                                \
+  case mcaint_sub:                                                             \
     RES = (A) - (B);                                                           \
     break;                                                                     \
-  case mca_div:                                                                \
+  case mcaint_div:                                                             \
     RES = (A) / (B);                                                           \
     break;                                                                     \
   default:                                                                     \
@@ -290,7 +355,7 @@ static void _mca_inexact_binary128(__float128 *qa, void *context) {
 /* and stores the result in (res) */
 #define PERFORM_TERNARY_OP(op, res, a, b, c)                                   \
   switch (op) {                                                                \
-  case mca_fma:                                                                \
+  case mcaint_fma:                                                             \
     res = fmaApprox((a), (b), (c));                                            \
     break;                                                                     \
   default:                                                                     \
@@ -299,7 +364,7 @@ static void _mca_inexact_binary128(__float128 *qa, void *context) {
 
 /* Generic macro function that returns mca(A OP B) */
 /* Functions are determined according to the type of X */
-#define _MCA_UNARY_OP(A, OP, CTX, X)                                           \
+#define _MCAINT_UNARY_OP(A, OP, CTX, X)                                        \
   do {                                                                         \
     typeof(X) _A = A;                                                          \
     typeof(X) _RES = 0;                                                        \
@@ -307,11 +372,11 @@ static void _mca_inexact_binary128(__float128 *qa, void *context) {
     if (TMP_CTX->daz) {                                                        \
       _A = DAZ(A);                                                             \
     }                                                                          \
-    if (TMP_CTX->mode == mcamode_pb || TMP_CTX->mode == mcamode_mca) {         \
+    if (TMP_CTX->mode == mcaint_mode_pb || TMP_CTX->mode == mcaint_mode_mca) { \
       _INEXACT_BINARYN(X, &_A, CTX);                                           \
     }                                                                          \
     PERFORM_UNARY_OP(OP, _RES, _A);                                            \
-    if (TMP_CTX->mode == mcamode_rr || TMP_CTX->mode == mcamode_mca) {         \
+    if (TMP_CTX->mode == mcaint_mode_rr || TMP_CTX->mode == mcaint_mode_mca) { \
       _INEXACT_BINARYN(X, &_RES, CTX);                                         \
     }                                                                          \
     if (TMP_CTX->ftz) {                                                        \
@@ -322,7 +387,7 @@ static void _mca_inexact_binary128(__float128 *qa, void *context) {
 
 /* Generic macro function that returns mca(A OP B) */
 /* Functions are determined according to the type of X */
-#define _MCA_BINARY_OP(A, B, OP, CTX, X)                                       \
+#define _MCAINT_BINARY_OP(A, B, OP, CTX, X)                                    \
   do {                                                                         \
     typeof(X) _A = A;                                                          \
     typeof(X) _B = B;                                                          \
@@ -332,12 +397,12 @@ static void _mca_inexact_binary128(__float128 *qa, void *context) {
       _A = DAZ(A);                                                             \
       _B = DAZ(B);                                                             \
     }                                                                          \
-    if (TMP_CTX->mode == mcamode_pb || TMP_CTX->mode == mcamode_mca) {         \
+    if (TMP_CTX->mode == mcaint_mode_pb || TMP_CTX->mode == mcaint_mode_mca) { \
       _INEXACT_BINARYN(X, &_A, CTX);                                           \
       _INEXACT_BINARYN(X, &_B, CTX);                                           \
     }                                                                          \
     PERFORM_BIN_OP(OP, _RES, _A, _B);                                          \
-    if (TMP_CTX->mode == mcamode_rr || TMP_CTX->mode == mcamode_mca) {         \
+    if (TMP_CTX->mode == mcaint_mode_rr || TMP_CTX->mode == mcaint_mode_mca) { \
       _INEXACT_BINARYN(X, &_RES, CTX);                                         \
     }                                                                          \
     if (TMP_CTX->ftz) {                                                        \
@@ -348,7 +413,7 @@ static void _mca_inexact_binary128(__float128 *qa, void *context) {
 
 /* Generic macro function that returns mca(A OP B OP C) */
 /* Functions are determined according to the type of X */
-#define _MCA_TERNARY_OP(A, B, C, OP, CTX, X)                                   \
+#define _MCAINT_TERNARY_OP(A, B, C, OP, CTX, X)                                \
   do {                                                                         \
     typeof(X) _A = A;                                                          \
     typeof(X) _B = B;                                                          \
@@ -360,13 +425,13 @@ static void _mca_inexact_binary128(__float128 *qa, void *context) {
       _B = DAZ(B);                                                             \
       _C = DAZ(C);                                                             \
     }                                                                          \
-    if (TMP_CTX->mode == mcamode_pb || TMP_CTX->mode == mcamode_mca) {         \
+    if (TMP_CTX->mode == mcaint_mode_pb || TMP_CTX->mode == mcaint_mode_mca) { \
       _INEXACT_BINARYN(X, &_A, CTX);                                           \
       _INEXACT_BINARYN(X, &_B, CTX);                                           \
       _INEXACT_BINARYN(X, &_C, CTX);                                           \
     }                                                                          \
     PERFORM_TERNARY_OP(OP, _RES, _A, _B, _C);                                  \
-    if (TMP_CTX->mode == mcamode_rr || TMP_CTX->mode == mcamode_mca) {         \
+    if (TMP_CTX->mode == mcaint_mode_rr || TMP_CTX->mode == mcaint_mode_mca) { \
       _INEXACT_BINARYN(X, &_RES, CTX);                                         \
     }                                                                          \
     if (TMP_CTX->ftz) {                                                        \
@@ -377,58 +442,60 @@ static void _mca_inexact_binary128(__float128 *qa, void *context) {
 
 /* Performs mca(dop a) where a is a binary32 value */
 /* Intermediate computations are performed with binary64 */
-static inline float
-_mca_binary32_unary_op(const float a, const mca_operations dop, void *context) {
-  _MCA_UNARY_OP(a, dop, context, (double)0);
+static inline float _mcaint_binary32_unary_op(const float a,
+                                              const mcaint_operations dop,
+                                              void *context) {
+  _MCAINT_UNARY_OP(a, dop, context, (double)0);
 }
 
 /* Performs mca(a dop b) where a and b are binary32 values */
 /* Intermediate computations are performed with binary64 */
-static inline float _mca_binary32_binary_op(const float a, const float b,
-                                            const mca_operations dop,
-                                            void *context) {
-  _MCA_BINARY_OP(a, b, dop, context, (double)0);
+static inline float _mcaint_binary32_binary_op(const float a, const float b,
+                                               const mcaint_operations dop,
+                                               void *context) {
+  _MCAINT_BINARY_OP(a, b, dop, context, (double)0);
 }
 
 /* Performs mca(a dop b dop c) where a, b and c are binary32 values */
 /* Intermediate computations are performed with binary64 */
-// float _mca_binary32_ternary_op(const float a, const float b, const float c,
-//                                const mca_operations dop, void *context);
+// float _mcaint_binary32_ternary_op(const float a, const float b, const float
+// c,
+//                                const mcaint_operations dop, void *context);
 
-static inline float _mca_binary32_ternary_op(const float a, const float b,
-                                             const float c,
-                                             const mca_operations dop,
-                                             void *context) {
-  _MCA_TERNARY_OP(a, b, c, dop, context, (double)0);
+static inline float _mcaint_binary32_ternary_op(const float a, const float b,
+                                                const float c,
+                                                const mcaint_operations dop,
+                                                void *context) {
+  _MCAINT_TERNARY_OP(a, b, c, dop, context, (double)0);
 }
 
 /* Performs mca(qop a) where a is a binary64 value */
 /* Intermediate computations are performed with binary128 */
-static inline double _mca_binary64_unary_op(const double a,
-                                            const mca_operations qop,
-                                            void *context) {
-  _MCA_UNARY_OP(a, qop, context, (__float128)0);
+static inline double _mcaint_binary64_unary_op(const double a,
+                                               const mcaint_operations qop,
+                                               void *context) {
+  _MCAINT_UNARY_OP(a, qop, context, (__float128)0);
 }
 
 /* Performs mca(a qop b) where a and b are binary64 values */
 /* Intermediate computations are performed with binary128 */
-static inline double _mca_binary64_binary_op(const double a, const double b,
-                                             const mca_operations qop,
-                                             void *context) {
-  _MCA_BINARY_OP(a, b, qop, context, (__float128)0);
+static inline double _mcaint_binary64_binary_op(const double a, const double b,
+                                                const mcaint_operations qop,
+                                                void *context) {
+  _MCAINT_BINARY_OP(a, b, qop, context, (__float128)0);
 }
 
 /* Performs mca(a qop b qop c) where a, b and c are binary64 values */
 /* Intermediate computations are performed with binary128 */
-// double _mca_binary64_ternary_op(const double a, const double b, const double
-// c,
-//                                 const mca_operations qop, void *context);
+// double _mcaint_binary64_ternary_op(const double a, const double b, const
+// double c,
+//                                 const mcaint_operations qop, void *context);
 
-static inline double _mca_binary64_ternary_op(const double a, const double b,
-                                              const double c,
-                                              const mca_operations qop,
-                                              void *context) {
-  _MCA_TERNARY_OP(a, b, c, qop, context, (__float128)0);
+static inline double _mcaint_binary64_ternary_op(const double a, const double b,
+                                                 const double c,
+                                                 const mcaint_operations qop,
+                                                 void *context) {
+  _MCAINT_TERNARY_OP(a, b, c, qop, context, (__float128)0);
 }
 
 /************************* FPHOOKS FUNCTIONS *************************
@@ -439,57 +506,57 @@ static inline double _mca_binary64_ternary_op(const double a, const double b,
 
 void INTERFLOP_MCAINT_API(add_float)(float a, float b, float *res,
                                      void *context) {
-  *res = _mca_binary32_binary_op(a, b, mca_add, context);
+  *res = _mcaint_binary32_binary_op(a, b, mcaint_add, context);
 }
 
 void INTERFLOP_MCAINT_API(sub_float)(float a, float b, float *res,
                                      void *context) {
-  *res = _mca_binary32_binary_op(a, b, mca_sub, context);
+  *res = _mcaint_binary32_binary_op(a, b, mcaint_sub, context);
 }
 
 void INTERFLOP_MCAINT_API(mul_float)(float a, float b, float *res,
                                      void *context) {
-  *res = _mca_binary32_binary_op(a, b, mca_mul, context);
+  *res = _mcaint_binary32_binary_op(a, b, mcaint_mul, context);
 }
 
 void INTERFLOP_MCAINT_API(div_float)(float a, float b, float *res,
                                      void *context) {
-  *res = _mca_binary32_binary_op(a, b, mca_div, context);
+  *res = _mcaint_binary32_binary_op(a, b, mcaint_div, context);
 }
 
 void INTERFLOP_MCAINT_API(fma_float)(float a, float b, float c, float *res,
                                      void *context) {
-  *res = _mca_binary32_ternary_op(a, b, c, mca_fma, context);
+  *res = _mcaint_binary32_ternary_op(a, b, c, mcaint_fma, context);
 }
 
 void INTERFLOP_MCAINT_API(add_double)(double a, double b, double *res,
                                       void *context) {
-  *res = _mca_binary64_binary_op(a, b, mca_add, context);
+  *res = _mcaint_binary64_binary_op(a, b, mcaint_add, context);
 }
 
 void INTERFLOP_MCAINT_API(sub_double)(double a, double b, double *res,
                                       void *context) {
-  *res = _mca_binary64_binary_op(a, b, mca_sub, context);
+  *res = _mcaint_binary64_binary_op(a, b, mcaint_sub, context);
 }
 
 void INTERFLOP_MCAINT_API(mul_double)(double a, double b, double *res,
                                       void *context) {
-  *res = _mca_binary64_binary_op(a, b, mca_mul, context);
+  *res = _mcaint_binary64_binary_op(a, b, mcaint_mul, context);
 }
 
 void INTERFLOP_MCAINT_API(div_double)(double a, double b, double *res,
                                       void *context) {
-  *res = _mca_binary64_binary_op(a, b, mca_div, context);
+  *res = _mcaint_binary64_binary_op(a, b, mcaint_div, context);
 }
 
 void INTERFLOP_MCAINT_API(fma_double)(double a, double b, double c, double *res,
                                       void *context) {
-  *res = _mca_binary64_ternary_op(a, b, c, mca_fma, context);
+  *res = _mcaint_binary64_ternary_op(a, b, c, mcaint_fma, context);
 }
 
 void INTERFLOP_MCAINT_API(cast_double_to_float)(double a, float *res,
                                                 void *context) {
-  *res = _mca_binary64_unary_op(a, mca_cast, context);
+  *res = _mcaint_binary64_unary_op(a, mcaint_cast, context);
 }
 
 static struct argp_option options[] = {
@@ -513,39 +580,44 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
   char *endptr;
   int val = -1;
   int error = 0;
+  float sparsity = -1;
+  uint64_t seed = -1;
   switch (key) {
   case KEY_PREC_B32:
     /* precision for binary32 */
     error = 0;
     val = interflop_strtol(arg, &endptr, &error);
-    if (error != 0 || val != MCA_PRECISION_BINARY32_DEFAULT) {
+    if (error != 0 || val != MCAINT_PRECISION_BINARY32_DEFAULT) {
       logger_error("--%s invalid value provided, MCA integer does not support "
                    "custom precisions",
                    key_prec_b32_str);
     }
-    _set_mca_precision_binary32(val, ctx);
+    _set_mcaint_precision_binary32(val, ctx);
     break;
   case KEY_PREC_B64:
     /* precision for binary64 */
     error = 0;
     val = interflop_strtol(arg, &endptr, &error);
-    if (error != 0 || val != MCA_PRECISION_BINARY64_DEFAULT) {
+    if (error != 0 || val != MCAINT_PRECISION_BINARY64_DEFAULT) {
       logger_error("--%s invalid value provided, MCA integer does not support "
                    "custom precisions",
                    key_prec_b64_str);
     }
-    _set_mca_precision_binary64(val, ctx);
+    _set_mcaint_precision_binary64(val, ctx);
     break;
   case KEY_MODE:
     /* mca mode */
-    if (interflop_strcasecmp(MCA_MODE_STR[mcamode_ieee], arg) == 0) {
-      _set_mca_mode(mcamode_ieee, ctx);
-    } else if (interflop_strcasecmp(MCA_MODE_STR[mcamode_mca], arg) == 0) {
-      _set_mca_mode(mcamode_mca, ctx);
-    } else if (interflop_strcasecmp(MCA_MODE_STR[mcamode_pb], arg) == 0) {
-      _set_mca_mode(mcamode_pb, ctx);
-    } else if (interflop_strcasecmp(MCA_MODE_STR[mcamode_rr], arg) == 0) {
-      _set_mca_mode(mcamode_rr, ctx);
+    if (interflop_strcasecmp(MCAINT_MODE_STR[mcaint_mode_ieee], arg) == 0) {
+      _set_mcaint_mode(mcaint_mode_ieee, ctx);
+    } else if (interflop_strcasecmp(MCAINT_MODE_STR[mcaint_mode_mca], arg) ==
+               0) {
+      _set_mcaint_mode(mcaint_mode_mca, ctx);
+    } else if (interflop_strcasecmp(MCAINT_MODE_STR[mcaint_mode_pb], arg) ==
+               0) {
+      _set_mcaint_mode(mcaint_mode_pb, ctx);
+    } else if (interflop_strcasecmp(MCAINT_MODE_STR[mcaint_mode_rr], arg) ==
+               0) {
+      _set_mcaint_mode(mcaint_mode_rr, ctx);
     } else {
       logger_error("--%s invalid value provided, must be one of: "
                    "{ieee, mca, pb, rr}.",
@@ -555,25 +627,25 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
   case KEY_SEED:
     /* seed */
     error = 0;
-    ctx->choose_seed = true;
-    ctx->seed = interflop_strtol(arg, &endptr, &error);
+    seed = interflop_strtol(arg, &endptr, &error);
     if (error != 0) {
       logger_error("--%s invalid value provided, must be an integer",
                    key_seed_str);
     }
+    _set_mcaint_seed(seed, ctx);
     break;
   case KEY_DAZ:
     /* denormals-are-zero */
-    ctx->daz = true;
+    _set_mcaint_daz(true, ctx);
     break;
   case KEY_FTZ:
     /* flush-to-zero */
-    ctx->ftz = true;
+    _set_mcaint_ftz(true, ctx);
     break;
   case KEY_SPARSITY:
     /* sparse perturbations */
     error = 0;
-    ctx->sparsity = interflop_strtod(arg, &endptr, &error);
+    sparsity = interflop_strtod(arg, &endptr, &error);
     if (ctx->sparsity <= 0) {
       error = 1;
     }
@@ -581,6 +653,7 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
       logger_error("--%s invalid value provided, must be positive",
                    key_sparsity_str);
     }
+    _set_mcaint_sparsity(sparsity, ctx);
     break;
   default:
     return ARGP_ERR_UNKNOWN;
@@ -591,14 +664,32 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
 struct argp argp = {options, parse_opt, "", "", NULL, NULL, NULL};
 
 static void init_context(mcaint_context_t *ctx) {
+  ctx->mode = MCAINT_MODE_DEFAULT;
+  ctx->binary32_precision = MCAINT_PRECISION_BINARY32_DEFAULT;
+  ctx->binary64_precision = MCAINT_PRECISION_BINARY64_DEFAULT;
   ctx->relErr = true;
   ctx->absErr = false;
-  ctx->absErr_exp = 112;
+  ctx->absErr_exp = MCAINT_ABSOLUTE_ERROR_EXPONENT_DEFAULT;
   ctx->choose_seed = false;
-  ctx->daz = false;
-  ctx->ftz = false;
-  ctx->seed = 0ULL;
-  ctx->sparsity = 1.0f;
+  ctx->daz = MCAINT_DAZ_DEFAULT;
+  ctx->ftz = MCAINT_FTZ_DEFAULT;
+  ctx->seed = MCAINT_SEED_DEFAULT;
+  ctx->sparsity = MCAINT_SPARSITY_DEFAULT;
+}
+
+void INTERFLOP_MCAINT_API(configure)(mcaint_conf_t conf, void *context) {
+  mcaint_context_t *ctx = (mcaint_context_t *)context;
+  _set_mcaint_seed(conf.seed, ctx);
+  _set_mcaint_sparsity(conf.sparsity, ctx);
+  _set_mcaint_precision_binary32(conf.precision_binary32, ctx);
+  _set_mcaint_precision_binary64(conf.precision_binary64, ctx);
+  _set_mcaint_mode(conf.mode, ctx);
+  _set_mcaint_error_mode(conf.err_mode, ctx);
+  if (conf.max_abs_err_exponent != (unsigned int)(-1)) {
+    _set_mcaint_max_abs_err_exp(conf.max_abs_err_exponent, ctx);
+  }
+  _set_mcaint_daz(conf.daz, ctx);
+  _set_mcaint_ftz(conf.ftz, ctx);
 }
 
 static void print_information_header(void *context) {
@@ -616,12 +707,12 @@ static void print_information_header(void *context) {
       "%s = %f"
       "\n",
       key_prec_b32_str, ctx->binary32_precision, key_prec_b64_str,
-      ctx->binary64_precision, key_mode_str, MCA_MODE_STR[ctx->mode],
+      ctx->binary64_precision, key_mode_str, MCAINT_MODE_STR[ctx->mode],
       key_err_mode_str,
-      (ctx->relErr && !ctx->absErr)   ? MCA_ERR_MODE_STR[mca_err_mode_rel]
-      : (!ctx->relErr && ctx->absErr) ? MCA_ERR_MODE_STR[mca_err_mode_abs]
-      : (ctx->relErr && ctx->absErr)  ? MCA_ERR_MODE_STR[mca_err_mode_all]
-                                      : MCA_ERR_MODE_STR[mca_err_mode_rel],
+      (ctx->relErr && !ctx->absErr)   ? MCAINT_ERR_MODE_STR[mcaint_err_mode_rel]
+      : (!ctx->relErr && ctx->absErr) ? MCAINT_ERR_MODE_STR[mcaint_err_mode_abs]
+      : (ctx->relErr && ctx->absErr)  ? MCAINT_ERR_MODE_STR[mcaint_err_mode_all]
+                                     : MCAINT_ERR_MODE_STR[mcaint_err_mode_rel],
       key_err_exp_str, (ctx->absErr_exp), key_daz_str,
       ctx->daz ? "true" : "false", key_ftz_str, ctx->ftz ? "true" : "false",
       key_sparsity_str, ctx->sparsity);
