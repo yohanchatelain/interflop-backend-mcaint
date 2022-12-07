@@ -77,7 +77,7 @@ typedef struct {
 } mcaint_conf_t;
 
 const char *INTERFLOP_MCAINT_API(get_backend_name)(void);
-const char *INTERFLOP_MCAINT_API(get_version_name)(void);
+const char *INTERFLOP_MCAINT_API(get_backend_version)(void);
 
 void mcaint_push_seed(IUint64_t seed);
 void mcaint_pop_seed(void);

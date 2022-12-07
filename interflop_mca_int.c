@@ -181,7 +181,9 @@ const char *get_mcaint_mode_name(mcaint_mode mode) {
 }
 const char *INTERFLOP_MCAINT_API(get_backend_name)(void) { return "mcaint"; }
 
-const char *INTERFLOP_MCAINT_API(get_version_name)(void) { return "1.x-dev"; }
+const char *INTERFLOP_MCAINT_API(get_backend_version)(void) {
+  return "1.x-dev";
+}
 
 /******************** MCA RANDOM FUNCTIONS ********************
  * The following functions are used to calculate the random
