@@ -37,7 +37,7 @@
 #include "interflop-stdlib/common/float_struct.h"
 #include "interflop-stdlib/common/float_utils.h"
 #include "interflop-stdlib/common/options.h"
-#include "interflop-stdlib/fma/fmaqApprox.h"
+#include "interflop-stdlib/fma/interflop_fma.h"
 #include "interflop-stdlib/interflop.h"
 #include "interflop-stdlib/interflop_stdlib.h"
 #include "interflop-stdlib/iostream/logger.h"
@@ -322,6 +322,12 @@ static void _mcaint_inexact_binary128(__float128 *qa, void *context) {
  * result converted to the original format for return
  *******************************************************************/
 
+#define PERFORM_FMA(A, B, C)                                                   \
+  _Generic(A, float                                                            \
+           : interflop_fma_binary32, double                                    \
+           : interflop_fma_binary64, __float128                                \
+           : interflop_fma_binary128)(A, B, C)
+
 /* perform_ternary_op: applies the ternary operator (op) to (a), (b) and (c) */
 /* and stores the result in (res) */
 #define PERFORM_UNARY_OP(op, res, a)                                           \
@@ -358,7 +364,7 @@ static void _mcaint_inexact_binary128(__float128 *qa, void *context) {
 #define PERFORM_TERNARY_OP(op, res, a, b, c)                                   \
   switch (op) {                                                                \
   case mcaint_fma:                                                             \
-    res = fmaApprox((a), (b), (c));                                            \
+    res = PERFORM_FMA((a), (b), (c));                                          \
     break;                                                                     \
   default:                                                                     \
     logger_error("invalid operator %c", op);                                   \
