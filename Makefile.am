@@ -8,7 +8,7 @@ libinterflop_mca_int_la_CFLAGS = \
     -I@INTERFLOP_STDLIB_PATH@/include/ \
     -O3 -fno-stack-protector
 if WALL_CFLAGS
-libinterflop_mca_int_la_CFLAGS += -Wall -Wextra
+libinterflop_mca_int_la_CFLAGS += -Wall -Wextra -g
 endif
 if RNG_THREAD_SAFE
 libinterflop_mca_int_la_CFLAGS += -DRNG_THREAD_SAFE
